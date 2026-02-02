@@ -1290,6 +1290,10 @@
                         <span class="menu-icon">💼</span>
                         <span>Trades</span>
                     </div>
+                    <div class="menu-item" data-view="payouts">
+                        <span class="menu-icon">💰</span>
+                        <span>Payouts</span>
+                    </div>
                     <div class="menu-item" data-view="statistics">
                         <span class="menu-icon">📈</span>
                         <span>Stats Compte</span>
@@ -1454,6 +1458,86 @@
                                     <td colspan="9" class="empty-state">
                                         <div class="empty-icon">📊</div>
                                         <div>Aucun trade enregistré</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payouts View -->
+                <div id="payouts" class="view">
+                    <div style="margin-bottom: 2rem;">
+                        <h2 class="calendar-title" style="margin-bottom: 0.5rem;">Historique des Payouts</h2>
+                        <p style="color: var(--text-secondary); font-size: 0.95rem;">Retraits effectués - n'impactent pas les statistiques de trading</p>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="dashboard-grid" style="margin-bottom: 2rem;">
+                        <div class="widget widget-1">
+                            <div class="widget-title">Total Payouts (Compte)</div>
+                            <div class="widget-value" id="payoutAccountTotal" style="color: var(--accent-red);">0€</div>
+                            <div class="widget-change" id="payoutAccountCount">
+                                <span>●</span>
+                                <span>0 payouts</span>
+                            </div>
+                        </div>
+
+                        <div class="widget widget-2">
+                            <div class="widget-title">Total Payouts (Global)</div>
+                            <div class="widget-value" id="payoutGlobalTotal" style="color: var(--accent-red);">0€</div>
+                            <div class="widget-change" id="payoutGlobalCount">
+                                <span>●</span>
+                                <span>0 payouts</span>
+                            </div>
+                        </div>
+
+                        <div class="widget widget-3">
+                            <div class="widget-title">Dernier Payout</div>
+                            <div class="widget-value" id="payoutLast" style="font-size: 1.3rem;">-</div>
+                            <div class="widget-change" id="payoutLastDate">
+                                <span>○</span>
+                                <span>-</span>
+                            </div>
+                        </div>
+
+                        <div class="widget widget-4">
+                            <div class="widget-title">Moyenne par Payout</div>
+                            <div class="widget-value" id="payoutAverage">0€</div>
+                            <div class="widget-change">
+                                <span>◐</span>
+                                <span>Moyenne</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payouts Table -->
+                    <div class="trades-container">
+                        <div class="trades-header">
+                            <h2 class="calendar-title">Liste des Payouts</h2>
+                            <div class="filter-pills">
+                                <button class="filter-pill active" data-filter-payout="all">Tous</button>
+                                <button class="filter-pill" data-filter-payout="month">Ce Mois</button>
+                                <button class="filter-pill" data-filter-payout="year">Cette Année</button>
+                            </div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Compte</th>
+                                    <th>Montant</th>
+                                    <th>Capital Avant</th>
+                                    <th>Capital Après</th>
+                                    <th>Notes</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payoutsTableBody">
+                                <tr>
+                                    <td colspan="7" class="empty-state">
+                                        <div class="empty-icon">💰</div>
+                                        <div>Aucun payout enregistré</div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -1716,6 +1800,10 @@
                     <input type="checkbox" id="followedStrategy">
                     <label for="followedStrategy">J'ai suivi ma stratégie</label>
                 </div>
+                <div class="checkbox-group" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--accent-red);">
+                    <input type="checkbox" id="isPayout">
+                    <label for="isPayout">💰 Payout (retrait - ne compte pas dans les stats)</label>
+                </div>
                 <button type="submit" class="btn" style="width: 100%;">Ajouter le Trade</button>
             </form>
         </div>
@@ -1818,7 +1906,8 @@
                     id: Date.now(),
                     name: 'Compte Principal',
                     propFirm: 'Personnel',
-                    baseCapital: 50000
+                    baseCapital: 50000,
+                    isBurned: false
                 };
                 this.accounts.push(defaultAccount);
                 this.currentAccountId = defaultAccount.id;
@@ -1896,6 +1985,7 @@
                 const titles = {
                     dashboard: 'Dashboard',
                     trades: 'Trades',
+                    payouts: 'Payouts',
                     statistics: 'Statistiques',
                     globalStats: 'Statistiques Globales',
                     journal: 'Journal',
@@ -1907,6 +1997,8 @@
                     this.updateStatistics();
                 } else if (viewName === 'globalStats') {
                     this.updateGlobalStatistics();
+                } else if (viewName === 'payouts') {
+                    this.updatePayoutsView();
                 }
 
                 // Close mobile menu after navigation
@@ -1959,33 +2051,124 @@
 
             renderAccountList() {
                 const list = document.getElementById('accountList');
-                list.innerHTML = this.accounts.map(acc => {
-                    const accTrades = this.trades.filter(t => t.accountId === acc.id);
-                    const accPnL = accTrades.reduce((s, t) => s + t.pnl, 0);
-                    const accCapital = acc.baseCapital + accPnL;
-                    const isActive = acc.id === this.currentAccountId;
+                
+                // Separate active and burned accounts
+                const activeAccounts = this.accounts.filter(acc => !acc.isBurned);
+                const burnedAccounts = this.accounts.filter(acc => acc.isBurned);
 
-                    return `
-                        <div class="account-item ${isActive ? 'active' : ''}" onclick="journal.selectAccount(${acc.id})">
-                            <div class="account-info">
-                                <h4>${acc.name}</h4>
-                                <p>🏢 ${acc.propFirm}</p>
+                let html = '';
+
+                // Active accounts
+                if (activeAccounts.length > 0) {
+                    html += activeAccounts.map(acc => {
+                        const accTrades = this.trades.filter(t => t.accountId === acc.id);
+                        const accPnL = accTrades.reduce((s, t) => s + t.pnl, 0);
+                        const accCapital = acc.baseCapital + accPnL;
+                        const isActive = acc.id === this.currentAccountId;
+
+                        return `
+                            <div class="account-item ${isActive ? 'active' : ''}" onclick="journal.selectAccount(${acc.id})">
+                                <div class="account-info">
+                                    <h4>${acc.name}</h4>
+                                    <p>🏢 ${acc.propFirm}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div class="account-value" style="color: ${accPnL >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                                        ${this.formatCurrency(accCapital)}
+                                    </div>
+                                    <button onclick="event.stopPropagation(); journal.toggleBurnAccount(${acc.id})" style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
+                                        🔥 Griller
+                                    </button>
+                                </div>
                             </div>
-                            <div class="account-value" style="color: ${accPnL >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">
-                                ${this.formatCurrency(accCapital)}
+                        `;
+                    }).join('');
+                }
+
+                // Burned accounts section
+                if (burnedAccounts.length > 0) {
+                    html += `
+                        <div style="margin: 1.5rem 0 0.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 0.75rem;">
+                                Comptes Grillés (${burnedAccounts.length})
                             </div>
                         </div>
                     `;
-                }).join('');
+                    
+                    html += burnedAccounts.map(acc => {
+                        const accTrades = this.trades.filter(t => t.accountId === acc.id);
+                        const accPnL = accTrades.reduce((s, t) => s + t.pnl, 0);
+                        const accCapital = acc.baseCapital + accPnL;
+
+                        return `
+                            <div class="account-item" style="opacity: 0.6; cursor: not-allowed; background: var(--bg-secondary);">
+                                <div class="account-info">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <h4 style="margin: 0;">${acc.name}</h4>
+                                        <span style="background: var(--accent-red); color: white; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700;">GRILLÉ</span>
+                                    </div>
+                                    <p>🏢 ${acc.propFirm}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div class="account-value" style="color: var(--text-secondary)">
+                                        ${this.formatCurrency(accCapital)}
+                                    </div>
+                                    <button onclick="event.stopPropagation(); journal.toggleBurnAccount(${acc.id})" style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-green); color: var(--accent-green); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
+                                        ✅ Réactiver
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                list.innerHTML = html;
             }
 
             selectAccount(id) {
+                const account = this.accounts.find(a => a.id === id);
+                if (account && account.isBurned) {
+                    alert('⚠️ Ce compte est grillé. Réactivez-le pour pouvoir l\'utiliser.');
+                    return;
+                }
                 this.currentAccountId = id;
                 this.saveCurrentAccountId();
-                const account = this.getCurrentAccount();
                 document.getElementById('currentAccountDisplay').textContent = account.name;
                 this.closeAccountModal();
                 this.updateAllDisplays();
+            }
+
+            toggleBurnAccount(id) {
+                const account = this.accounts.find(a => a.id === id);
+                if (!account) return;
+
+                if (account.isBurned) {
+                    // Réactiver
+                    if (confirm(`Réactiver le compte "${account.name}" ?`)) {
+                        account.isBurned = false;
+                        this.saveAccounts();
+                        this.renderAccountList();
+                    }
+                } else {
+                    // Griller
+                    if (confirm(`⚠️ Griller le compte "${account.name}" ?\n\nLe compte sera désactivé mais l'historique sera conservé.`)) {
+                        account.isBurned = true;
+                        
+                        // Si c'est le compte actif, switch vers un autre
+                        if (this.currentAccountId === id) {
+                            const activeAccounts = this.accounts.filter(a => !a.isBurned && a.id !== id);
+                            if (activeAccounts.length > 0) {
+                                this.currentAccountId = activeAccounts[0].id;
+                                this.saveCurrentAccountId();
+                                document.getElementById('currentAccountDisplay').textContent = activeAccounts[0].name;
+                            }
+                        }
+                        
+                        this.saveAccounts();
+                        this.renderAccountList();
+                        this.updateAllDisplays();
+                    }
+                }
             }
 
             addAccount() {
@@ -1993,7 +2176,8 @@
                     id: Date.now(),
                     name: document.getElementById('accountName').value,
                     propFirm: document.getElementById('propFirm').value,
-                    baseCapital: parseFloat(document.getElementById('accountCapital').value)
+                    baseCapital: parseFloat(document.getElementById('accountCapital').value),
+                    isBurned: false
                 };
 
                 this.accounts.push(account);
@@ -2010,6 +2194,8 @@
                     instrumentValue = document.getElementById('customInstrument').value.toUpperCase();
                 }
 
+                const isPayout = document.getElementById('isPayout').checked;
+
                 const trade = {
                     id: Date.now(),
                     accountId: this.currentAccountId,
@@ -2020,8 +2206,14 @@
                     size: parseFloat(document.getElementById('positionSize').value),
                     tradingViewLink: document.getElementById('tradingViewLink').value,
                     followedStrategy: document.getElementById('followedStrategy').checked,
-                    notes: document.getElementById('notes').value
+                    notes: document.getElementById('notes').value,
+                    isPayout: isPayout
                 };
+
+                // Si c'est un payout, le P&L doit être négatif
+                if (isPayout && trade.pnl > 0) {
+                    trade.pnl = -trade.pnl;
+                }
 
                 const currentCapital = this.getCurrentCapital();
                 trade.pnlPercent = (trade.pnl / currentCapital) * 100;
@@ -2048,7 +2240,15 @@
             }
 
             getAccountTrades() {
-                return this.trades.filter(t => t.accountId === this.currentAccountId);
+                return this.trades.filter(t => t.accountId === this.currentAccountId && !t.isPayout);
+            }
+
+            getAccountPayouts() {
+                return this.trades.filter(t => t.accountId === this.currentAccountId && t.isPayout);
+            }
+
+            getAllPayouts() {
+                return this.trades.filter(t => t.isPayout);
             }
 
             previousMonth() {
@@ -2242,7 +2442,10 @@
 
             updateAllDisplays() {
                 const account = this.getCurrentAccount();
-                document.getElementById('currentAccountDisplay').textContent = account.name;
+                const displayText = account.isBurned 
+                    ? `${account.name} 🔥` 
+                    : account.name;
+                document.getElementById('currentAccountDisplay').textContent = displayText;
                 
                 this.updateWidgets();
                 this.renderCalendar();
@@ -2798,6 +3001,88 @@
                 } catch (error) {
                     console.error('Erreur chargement Drive:', error);
                 }
+            }
+
+            updatePayoutsView() {
+                const accountPayouts = this.getAccountPayouts();
+                const allPayouts = this.getAllPayouts();
+
+                // Account totals
+                const accountTotal = accountPayouts.reduce((sum, p) => sum + Math.abs(p.pnl), 0);
+                const globalTotal = allPayouts.reduce((sum, p) => sum + Math.abs(p.pnl), 0);
+
+                document.getElementById('payoutAccountTotal').textContent = this.formatCurrency(accountTotal);
+                document.getElementById('payoutAccountCount').innerHTML = `
+                    <span>●</span>
+                    <span>${accountPayouts.length} payout${accountPayouts.length > 1 ? 's' : ''}</span>
+                `;
+
+                document.getElementById('payoutGlobalTotal').textContent = this.formatCurrency(globalTotal);
+                document.getElementById('payoutGlobalCount').innerHTML = `
+                    <span>●</span>
+                    <span>${allPayouts.length} payout${allPayouts.length > 1 ? 's' : ''}</span>
+                `;
+
+                // Last payout
+                if (accountPayouts.length > 0) {
+                    const lastPayout = accountPayouts[0];
+                    document.getElementById('payoutLast').textContent = this.formatCurrency(Math.abs(lastPayout.pnl));
+                    document.getElementById('payoutLastDate').innerHTML = `
+                        <span>○</span>
+                        <span>${new Date(lastPayout.date).toLocaleDateString('fr-FR')}</span>
+                    `;
+                } else {
+                    document.getElementById('payoutLast').textContent = '-';
+                    document.getElementById('payoutLastDate').innerHTML = `<span>○</span><span>-</span>`;
+                }
+
+                // Average
+                const average = accountPayouts.length > 0 ? accountTotal / accountPayouts.length : 0;
+                document.getElementById('payoutAverage').textContent = this.formatCurrency(average);
+
+                // Render table
+                this.renderPayoutsTable();
+            }
+
+            renderPayoutsTable() {
+                const tbody = document.getElementById('payoutsTableBody');
+                const accountPayouts = this.getAccountPayouts();
+
+                if (accountPayouts.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                <div class="empty-icon">💰</div>
+                                <div>Aucun payout enregistré</div>
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                const accountsMap = {};
+                this.accounts.forEach(acc => accountsMap[acc.id] = acc.name);
+
+                tbody.innerHTML = accountPayouts.map(payout => {
+                    const amount = Math.abs(payout.pnl);
+                    // Calculer le capital avant et après (approximatif)
+                    const capitalBefore = this.getCurrentCapital() + amount;
+                    const capitalAfter = this.getCurrentCapital();
+
+                    return `
+                        <tr>
+                            <td>${new Date(payout.date).toLocaleDateString('fr-FR')}</td>
+                            <td style="font-weight: 600;">${accountsMap[payout.accountId] || 'Compte'}</td>
+                            <td class="pnl-value negative" style="font-size: 1.1rem;">-${this.formatCurrency(amount)}</td>
+                            <td>${this.formatCurrency(capitalBefore)}</td>
+                            <td>${this.formatCurrency(capitalAfter)}</td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${payout.notes || '-'}</td>
+                            <td>
+                                <button onclick="journal.deleteTrade(${payout.id})" style="background: var(--accent-red); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">×</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }
 
             formatCurrency(value) {
