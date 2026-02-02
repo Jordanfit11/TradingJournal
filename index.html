@@ -6,8 +6,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>TradeZilla Pro - Journal de Trading</title>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap');
         
@@ -128,7 +126,6 @@
             padding-top: 64px;
         }
 
-        /* [REST OF THE CSS FROM PREVIOUS VERSION - keeping all existing styles] */
         .sidebar {
             width: 260px;
             background: var(--sidebar-bg);
@@ -324,9 +321,6 @@
             overflow: hidden;
         }
 
-        /* Copy all remaining CSS from previous version */
-        /* ... (keeping all existing styles for brevity) ... */
-
         .top-bar {
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border);
@@ -379,8 +373,25 @@
             padding: 2rem;
         }
 
-        /* NOTE: Insert all remaining CSS from previous version here */
-        /* For brevity, I'm showing the structure. The full CSS would be identical to previous version */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
 
         @media (max-width: 768px) {
             .desktop-text {
@@ -522,33 +533,56 @@
             <div class="content-area">
                 <!-- Dashboard View -->
                 <div id="dashboard" class="view active">
-                    <div style="text-align: center; padding: 4rem 2rem; color: var(--text-secondary);">
-                        <div style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.3;">⚡</div>
+                    <div class="empty-state">
+                        <div class="empty-icon">⚡</div>
                         <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">TradeZilla Pro avec Google Drive</h2>
                         <p>Connectez-vous avec Google pour commencer à synchroniser vos trades</p>
                     </div>
                 </div>
 
-                <!-- Other views would be identical to previous version -->
+                <!-- Trades View -->
+                <div id="trades" class="view">
+                    <div class="empty-state">
+                        <div class="empty-icon">💼</div>
+                        <h3>Liste des Trades</h3>
+                        <p>Connectez-vous pour voir vos trades</p>
+                    </div>
+                </div>
+
+                <!-- Statistics View -->
+                <div id="statistics" class="view">
+                    <div class="empty-state">
+                        <div class="empty-icon">📈</div>
+                        <h3>Statistiques du Compte</h3>
+                        <p>Connectez-vous pour voir vos statistiques</p>
+                    </div>
+                </div>
+
+                <!-- Global Stats View -->
+                <div id="globalStats" class="view">
+                    <div class="empty-state">
+                        <div class="empty-icon">🌍</div>
+                        <h3>Statistiques Globales</h3>
+                        <p>Connectez-vous pour voir vos statistiques globales</p>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
-        // Configuration Google Drive
+        // Configuration Google OAuth (SANS API KEY - plus sécurisé pour GitHub)
         const GOOGLE_CLIENT_ID = '5328933201-hhed8j3flifhdf4229sfof4247hugd1h.apps.googleusercontent.com';
-        const GOOGLE_API_KEY = 'AIzaSyBfa0Sil2qETKBMj_xs-l0bJmnKb1E4jfA';
         const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
         const TRADEZILLA_FILENAME = 'tradezilla-data.json';
 
         class TradingJournal {
             constructor() {
-                this.googleAuth = null;
+                this.accessToken = null;
                 this.googleUser = null;
                 this.driveFileId = null;
                 this.currentView = 'dashboard';
-                this.currentMonth = new Date();
-                this.currentFilter = 'all';
                 this.settings = this.loadSettings();
                 this.accounts = this.loadAccounts();
                 this.currentAccountId = this.loadCurrentAccountId();
@@ -561,29 +595,34 @@
                     this.createDefaultAccount();
                 }
                 this.setupEventListeners();
-                await this.initGoogleDrive();
+                
+                // Check if user was previously signed in
+                const savedToken = localStorage.getItem('google_access_token');
+                const savedUser = localStorage.getItem('google_user');
+                
+                if (savedToken && savedUser) {
+                    this.accessToken = savedToken;
+                    this.googleUser = JSON.parse(savedUser);
+                    this.updateGoogleUI(true);
+                    await this.loadFromDrive();
+                }
+                
                 this.updateAllDisplays();
-                document.getElementById('tradeDate').valueAsDate = new Date();
             }
 
-            async initGoogleDrive() {
-                try {
-                    // Check if user was previously signed in
-                    const savedToken = localStorage.getItem('google_access_token');
-                    if (savedToken) {
-                        await this.loadFromDrive();
-                    }
+            setupEventListeners() {
+                // Google Sign In
+                document.getElementById('googleSignInBtn').addEventListener('click', () => {
+                    this.signInWithGoogle();
+                });
 
-                    // Initialize Google API
-                    gapi.load('client', async () => {
-                        await gapi.client.init({
-                            apiKey: GOOGLE_API_KEY,
-                            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-                        });
+                // Menu navigation
+                document.querySelectorAll('.menu-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        const view = e.currentTarget.dataset.view;
+                        this.switchView(view);
                     });
-                } catch (error) {
-                    console.error('Erreur init Google Drive:', error);
-                }
+                });
             }
 
             async signInWithGoogle() {
@@ -593,12 +632,14 @@
                         scope: GOOGLE_DRIVE_SCOPE,
                         callback: async (response) => {
                             if (response.access_token) {
+                                this.accessToken = response.access_token;
                                 localStorage.setItem('google_access_token', response.access_token);
-                                gapi.client.setToken({ access_token: response.access_token });
                                 
                                 // Get user info
                                 const userInfo = await this.getUserInfo(response.access_token);
                                 this.googleUser = userInfo;
+                                localStorage.setItem('google_user', JSON.stringify(userInfo));
+                                
                                 this.updateGoogleUI(true);
                                 
                                 // Load data from Drive
@@ -646,7 +687,8 @@
             async signOut() {
                 if (confirm('Êtes-vous sûr de vouloir vous déconnecter ? Vos données locales seront conservées.')) {
                     localStorage.removeItem('google_access_token');
-                    gapi.client.setToken(null);
+                    localStorage.removeItem('google_user');
+                    this.accessToken = null;
                     this.googleUser = null;
                     this.driveFileId = null;
                     this.updateGoogleUI(false);
@@ -656,7 +698,7 @@
 
             async saveToDrive() {
                 try {
-                    if (!gapi.client.getToken()) {
+                    if (!this.accessToken) {
                         console.log('Pas connecté à Google Drive');
                         return;
                     }
@@ -676,14 +718,16 @@
 
                     // Check if file exists
                     if (!this.driveFileId) {
-                        const searchResponse = await gapi.client.drive.files.list({
-                            q: `name='${TRADEZILLA_FILENAME}' and trashed=false`,
-                            fields: 'files(id, name)',
-                            spaces: 'drive'
-                        });
+                        const searchResponse = await fetch(
+                            `https://www.googleapis.com/drive/v3/files?q=name='${TRADEZILLA_FILENAME}'+and+trashed=false&fields=files(id,name)`,
+                            {
+                                headers: { Authorization: `Bearer ${this.accessToken}` }
+                            }
+                        );
+                        const searchResult = await searchResponse.json();
 
-                        if (searchResponse.result.files.length > 0) {
-                            this.driveFileId = searchResponse.result.files[0].id;
+                        if (searchResult.files && searchResult.files.length > 0) {
+                            this.driveFileId = searchResult.files[0].id;
                         }
                     }
 
@@ -696,7 +740,6 @@
                     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
                     form.append('file', file);
 
-                    const token = gapi.client.getToken();
                     const url = this.driveFileId
                         ? `https://www.googleapis.com/upload/drive/v3/files/${this.driveFileId}?uploadType=multipart`
                         : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
@@ -705,9 +748,7 @@
 
                     const response = await fetch(url, {
                         method: method,
-                        headers: {
-                            Authorization: `Bearer ${token.access_token}`,
-                        },
+                        headers: { Authorization: `Bearer ${this.accessToken}` },
                         body: form
                     });
 
@@ -723,31 +764,34 @@
 
             async loadFromDrive() {
                 try {
-                    if (!gapi.client.getToken()) return;
+                    if (!this.accessToken) return;
 
                     this.showSyncStatus('⬇️ Chargement...', 'syncing');
 
                     // Search for the file
-                    const searchResponse = await gapi.client.drive.files.list({
-                        q: `name='${TRADEZILLA_FILENAME}' and trashed=false`,
-                        fields: 'files(id, name)',
-                        spaces: 'drive'
-                    });
+                    const searchResponse = await fetch(
+                        `https://www.googleapis.com/drive/v3/files?q=name='${TRADEZILLA_FILENAME}'+and+trashed=false&fields=files(id,name)`,
+                        {
+                            headers: { Authorization: `Bearer ${this.accessToken}` }
+                        }
+                    );
+                    const searchResult = await searchResponse.json();
 
-                    if (searchResponse.result.files.length === 0) {
+                    if (!searchResult.files || searchResult.files.length === 0) {
                         this.showSyncStatus('ℹ️ Aucune donnée cloud', 'info');
                         return;
                     }
 
-                    this.driveFileId = searchResponse.result.files[0].id;
+                    this.driveFileId = searchResult.files[0].id;
 
                     // Download file content
-                    const fileResponse = await gapi.client.drive.files.get({
-                        fileId: this.driveFileId,
-                        alt: 'media'
-                    });
-
-                    const data = fileResponse.result;
+                    const fileResponse = await fetch(
+                        `https://www.googleapis.com/drive/v3/files/${this.driveFileId}?alt=media`,
+                        {
+                            headers: { Authorization: `Bearer ${this.accessToken}` }
+                        }
+                    );
+                    const data = await fileResponse.json();
 
                     // Restore data
                     if (data.settings) this.settings = data.settings;
@@ -780,7 +824,6 @@
                 }, 3000);
             }
 
-            // Override save methods to also save to Drive
             saveTrades() {
                 localStorage.setItem('tradeJournalTrades', JSON.stringify(this.trades));
                 this.saveToDrive();
@@ -801,9 +844,6 @@
                 this.saveToDrive();
             }
 
-            // ... (rest of the methods remain the same as previous version)
-            // Including all the trading functionality, calendar, stats, etc.
-
             loadSettings() {
                 const defaultSettings = { monthlyGoal: 4, dailyGoal: 0.2 };
                 const saved = localStorage.getItem('tradeJournalSettings');
@@ -818,6 +858,11 @@
             loadCurrentAccountId() {
                 const saved = localStorage.getItem('currentAccountId');
                 return saved ? parseInt(saved) : null;
+            }
+
+            loadTrades() {
+                const saved = localStorage.getItem('tradeJournalTrades');
+                return saved ? JSON.parse(saved) : [];
             }
 
             createDefaultAccount() {
@@ -835,28 +880,6 @@
 
             getCurrentAccount() {
                 return this.accounts.find(a => a.id === this.currentAccountId) || this.accounts[0];
-            }
-
-            loadTrades() {
-                const saved = localStorage.getItem('tradeJournalTrades');
-                return saved ? JSON.parse(saved) : [];
-            }
-
-            setupEventListeners() {
-                // Google Sign In
-                document.getElementById('googleSignInBtn').addEventListener('click', () => {
-                    this.signInWithGoogle();
-                });
-
-                // Menu navigation
-                document.querySelectorAll('.menu-item').forEach(item => {
-                    item.addEventListener('click', (e) => {
-                        const view = e.currentTarget.dataset.view;
-                        this.switchView(view);
-                    });
-                });
-
-                // ... (rest of event listeners same as before)
             }
 
             switchView(viewName) {
@@ -893,9 +916,19 @@
                 overlay.classList.remove('active');
             }
 
+            openAccountModal() {
+                alert('Modal de gestion des comptes - À implémenter avec le reste du code');
+            }
+
+            openTradeModal() {
+                alert('Modal d\'ajout de trade - À implémenter avec le reste du code');
+            }
+
             updateAllDisplays() {
                 const account = this.getCurrentAccount();
-                document.getElementById('currentAccountDisplay').textContent = account.name;
+                if (account) {
+                    document.getElementById('currentAccountDisplay').textContent = account.name;
+                }
             }
 
             formatCurrency(value) {
