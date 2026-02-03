@@ -106,6 +106,10 @@
             justify-content: center;
         }
 
+        .mobile-only {
+            display: none;
+        }
+
         .logo {
             padding: 1.5rem;
             font-size: 1.5rem;
@@ -564,6 +568,57 @@
             border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 700;
+
+        /* Trade Cards for Mobile */
+        .trade-card {
+            display: none; /* Hidden by default, shown on mobile */
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .trade-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .trade-card-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .trade-card-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .trade-card-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .trade-card-value {
+            font-weight: 600;
+        }
+
+        .trade-card-actions {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.5rem;
+        }
             text-transform: uppercase;
         }
 
@@ -947,6 +1002,14 @@
                 display: flex;
             }
 
+            .mobile-only {
+                display: flex !important;
+            }
+
+            .account-selector {
+                display: none;
+            }
+
             .top-bar {
                 padding: 1rem;
                 flex-wrap: wrap;
@@ -1023,92 +1086,8 @@
                 grid-column: span 1;
             }
 
-            .calendar {
-                padding: 1rem;
-            }
-
-            .calendar-header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: flex-start;
-            }
-
-            .calendar-title {
-                font-size: 1.1rem;
-            }
-
-            .calendar-grid {
-                gap: 0.35rem;
-            }
-
-            .calendar-day {
-                padding: 0.35rem;
-                font-size: 0.85rem;
-                min-height: 60px;
-            }
-
-            .calendar-day-number {
-                font-size: 0.85rem;
-            }
-
-            .calendar-day-pnl {
-                font-size: 0.7rem;
-            }
-
-            .calendar-day-trades {
-                font-size: 0.65rem;
-            }
-
-            .weekly-summary {
-                padding: 1rem;
-            }
-
-            .week-item {
-                padding: 0.875rem;
-            }
-
-            .week-pnl {
-                font-size: 1.35rem;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-
-            .stat-card {
-                padding: 1.25rem;
-            }
-
-            .comparison-boxes {
-                grid-template-columns: 1fr;
-                gap: 0.75rem;
-            }
-
-            .comparison-value {
-                font-size: 1.5rem;
-            }
-
-            .day-performance {
-                gap: 0.75rem;
-            }
-
-            .day-row {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 0.5rem;
-            }
-
-            .day-name {
-                min-width: auto;
-            }
-
-            .day-value {
-                text-align: left;
-            }
-
             .trades-container {
-                overflow-x: auto;
+                overflow-x: visible;
             }
 
             .trades-header {
@@ -1130,9 +1109,17 @@
                 flex-shrink: 0;
             }
 
+            /* Hide tables on mobile, show cards */
             table {
-                font-size: 0.85rem;
-                min-width: 800px;
+                display: none;
+            }
+
+            .trade-card {
+                display: block;
+            }
+
+            .trades-container .empty-state {
+                display: flex;
             }
 
             th, td {
@@ -1326,6 +1313,10 @@
 
                 <div class="menu-section">
                     <div class="menu-label">Outils</div>
+                    <div class="menu-item mobile-only" onclick="journal.openAccountModal()">
+                        <span class="menu-icon">👤</span>
+                        <span>Changer de Compte</span>
+                    </div>
                     <div class="menu-item" data-view="journal">
                         <span class="menu-icon">📝</span>
                         <span>Journal</span>
@@ -1482,6 +1473,10 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <!-- Mobile Cards Container -->
+                        <div id="tradesCardsContainer" style="padding: 1rem;">
+                            <!-- Generated by JS -->
+                        </div>
                     </div>
                 </div>
 
@@ -1562,6 +1557,10 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <!-- Mobile Cards Container -->
+                        <div id="payoutsCardsContainer" style="padding: 1rem;">
+                            <!-- Generated by JS -->
+                        </div>
                     </div>
                 </div>
 
@@ -2682,15 +2681,27 @@
                             </td>
                         </tr>
                     `;
+                    
+                    // Also update mobile cards container
+                    const cardsContainer = document.getElementById('tradesCardsContainer');
+                    if (cardsContainer) {
+                        cardsContainer.innerHTML = `
+                            <div class="empty-state" style="display: flex; flex-direction: column; align-items: center; padding: 2rem; color: var(--text-secondary);">
+                                <div class="empty-icon">📊</div>
+                                <div>Aucun trade trouvé</div>
+                            </div>
+                        `;
+                    }
                     return;
                 }
 
+                // Table rows for desktop
                 tbody.innerHTML = filteredTrades.map(trade => `
                     <tr>
                         <td>${new Date(trade.date).toLocaleDateString('fr-FR')}</td>
-                        <td style="font-weight: 600;">${trade.instrument}</td>
-                        <td><span class="trade-type-badge ${trade.type.toLowerCase()}">${trade.type}</span></td>
-                        <td>${trade.size}</td>
+                        <td style="font-weight: 600;">${trade.instrument || '-'}</td>
+                        <td><span class="trade-type-badge ${trade.type ? trade.type.toLowerCase() : ''}">${trade.type || '-'}</span></td>
+                        <td>${trade.size || '-'}</td>
                         <td class="pnl-value ${trade.pnl >= 0 ? 'positive' : 'negative'}">
                             ${trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}€
                         </td>
@@ -2708,6 +2719,56 @@
                         </td>
                     </tr>
                 `).join('');
+
+                // Mobile cards
+                const cardsContainer = document.getElementById('tradesCardsContainer');
+                if (cardsContainer) {
+                    cardsContainer.innerHTML = filteredTrades.map(trade => `
+                        <div class="trade-card">
+                            <div class="trade-card-header">
+                                <div>
+                                    <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">
+                                        ${trade.instrument || '-'}
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                        ${new Date(trade.date).toLocaleDateString('fr-FR')}
+                                    </div>
+                                </div>
+                                <div class="pnl-value ${trade.pnl >= 0 ? 'positive' : 'negative'}" style="font-size: 1.3rem; font-weight: 700;">
+                                    ${trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}€
+                                </div>
+                            </div>
+                            <div class="trade-card-body">
+                                <div class="trade-card-field">
+                                    <div class="trade-card-label">Type</div>
+                                    <div class="trade-card-value">
+                                        <span class="trade-type-badge ${trade.type ? trade.type.toLowerCase() : ''}">${trade.type || '-'}</span>
+                                    </div>
+                                </div>
+                                <div class="trade-card-field">
+                                    <div class="trade-card-label">Taille</div>
+                                    <div class="trade-card-value">${trade.size || '-'} lots</div>
+                                </div>
+                                <div class="trade-card-field">
+                                    <div class="trade-card-label">% Capital</div>
+                                    <div class="trade-card-value" style="color: ${trade.pnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                                        ${trade.pnl >= 0 ? '+' : ''}${trade.pnlPercent.toFixed(2)}%
+                                    </div>
+                                </div>
+                                <div class="trade-card-field">
+                                    <div class="trade-card-label">Stratégie</div>
+                                    <div class="trade-card-value">${trade.followedStrategy ? '✅ Oui' : '❌ Non'}</div>
+                                </div>
+                            </div>
+                            <div class="trade-card-actions">
+                                ${trade.tradingViewLink ? 
+                                    `<a href="${trade.tradingViewLink}" target="_blank" class="btn btn-outline" style="flex: 1; text-align: center; padding: 0.5rem; font-size: 0.85rem;">📈 Chart</a>` : 
+                                    ''}
+                                <button onclick="journal.deleteTrade(${trade.id})" class="btn" style="background: var(--accent-red); flex: ${trade.tradingViewLink ? '0' : '1'}; padding: 0.5rem 1rem; font-size: 0.85rem;">Supprimer</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
             }
 
             updateAllDisplays() {
@@ -3327,15 +3388,25 @@
                             </td>
                         </tr>
                     `;
+                    
+                    const cardsContainer = document.getElementById('payoutsCardsContainer');
+                    if (cardsContainer) {
+                        cardsContainer.innerHTML = `
+                            <div class="empty-state" style="display: flex; flex-direction: column; align-items: center; padding: 2rem; color: var(--text-secondary);">
+                                <div class="empty-icon">💰</div>
+                                <div>Aucun payout enregistré</div>
+                            </div>
+                        `;
+                    }
                     return;
                 }
 
                 const accountsMap = {};
                 this.accounts.forEach(acc => accountsMap[acc.id] = acc.name);
 
+                // Table rows for desktop
                 tbody.innerHTML = accountPayouts.map(payout => {
                     const amount = Math.abs(payout.pnl);
-                    // Calculer le capital avant et après (approximatif)
                     const capitalBefore = this.getCurrentCapital() + amount;
                     const capitalAfter = this.getCurrentCapital();
 
@@ -3353,6 +3424,41 @@
                         </tr>
                     `;
                 }).join('');
+
+                // Mobile cards
+                const cardsContainer = document.getElementById('payoutsCardsContainer');
+                if (cardsContainer) {
+                    cardsContainer.innerHTML = accountPayouts.map(payout => {
+                        const amount = Math.abs(payout.pnl);
+                        
+                        return `
+                            <div class="trade-card">
+                                <div class="trade-card-header">
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">
+                                            ${accountsMap[payout.accountId] || 'Compte'}
+                                        </div>
+                                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                            ${new Date(payout.date).toLocaleDateString('fr-FR')}
+                                        </div>
+                                    </div>
+                                    <div class="pnl-value negative" style="font-size: 1.3rem; font-weight: 700;">
+                                        -${this.formatCurrency(amount)}
+                                    </div>
+                                </div>
+                                <div class="trade-card-body">
+                                    <div class="trade-card-field" style="grid-column: span 2;">
+                                        <div class="trade-card-label">Notes</div>
+                                        <div class="trade-card-value">${payout.notes || '-'}</div>
+                                    </div>
+                                </div>
+                                <div class="trade-card-actions">
+                                    <button onclick="journal.deleteTrade(${payout.id})" class="btn" style="background: var(--accent-red); flex: 1; padding: 0.5rem 1rem; font-size: 0.85rem;">Supprimer</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
             }
 
             // Playbook Management
