@@ -1020,6 +1020,10 @@
                 font-size: 1.25rem;
             }
 
+            #topAccountDisplay {
+                display: none !important;
+            }
+
             .top-actions {
                 gap: 0.5rem;
                 flex-wrap: wrap;
@@ -1345,9 +1349,16 @@
         <main class="main-content">
             <!-- Top Bar -->
             <div class="top-bar">
-                <div style="display: flex; align-items: center; gap: 1rem;">
+                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                     <button class="mobile-menu-btn" onclick="journal.toggleMobileMenu()">☰</button>
                     <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: var(--text-secondary); font-size: 1.25rem; font-weight: 300;">•</span>
+                        <div id="topAccountDisplay" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1)); border: 1px solid var(--accent-primary); border-radius: 8px; cursor: pointer;" onclick="journal.openAccountModal()">
+                            <span style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);" id="topAccountName">Compte Principal</span>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);" id="topAccountFirm">Prop Firm</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="top-actions">
                     <button class="btn btn-outline" onclick="journal.toggleTheme()" style="padding: 0.75rem; min-width: auto;" title="Changer de thème">
@@ -1954,6 +1965,27 @@
         </div>
     </div>
 
+    <!-- Edit Account Modal -->
+    <div id="editAccountModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 style="margin-bottom: 1.5rem;">✏️ Éditer le compte</h2>
+            <form id="editAccountForm" onsubmit="journal.saveAccountEdit(event)">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="editAccountName">Nom du compte</label>
+                    <input type="text" id="editAccountName" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary);">
+                </div>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="editAccountPropFirm">Prop Firm</label>
+                    <input type="text" id="editAccountPropFirm" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary);">
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" class="btn" style="flex: 1;">💾 Enregistrer</button>
+                    <button type="button" class="btn btn-outline" onclick="journal.closeEditAccountModal()" style="flex: 1;">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Add Rule Modal -->
     <div id="addRuleModal" class="modal">
         <div class="modal-content" style="max-width: 500px;">
@@ -2356,21 +2388,42 @@
                 const account = this.accounts.find(a => a.id === id);
                 if (!account) return;
 
-                const newName = prompt(`Nom du compte :`, account.name);
-                if (!newName || !newName.trim()) return;
+                // Store the account ID being edited
+                this.editingAccountId = id;
 
-                const newPropFirm = prompt(`Prop Firm :`, account.propFirm);
-                if (!newPropFirm || !newPropFirm.trim()) return;
+                // Pre-fill the form
+                document.getElementById('editAccountName').value = account.name;
+                document.getElementById('editAccountPropFirm').value = account.propFirm;
+
+                // Open modal
+                document.getElementById('editAccountModal').classList.add('active');
+            }
+
+            closeEditAccountModal() {
+                document.getElementById('editAccountModal').classList.remove('active');
+                document.getElementById('editAccountForm').reset();
+                this.editingAccountId = null;
+            }
+
+            saveAccountEdit(e) {
+                e.preventDefault();
+                
+                const account = this.accounts.find(a => a.id === this.editingAccountId);
+                if (!account) return;
+
+                const newName = document.getElementById('editAccountName').value.trim();
+                const newPropFirm = document.getElementById('editAccountPropFirm').value.trim();
 
                 // Update account
-                account.name = newName.trim();
-                account.propFirm = newPropFirm.trim();
+                account.name = newName;
+                account.propFirm = newPropFirm;
                 
                 this.saveAccounts();
                 this.renderAccountList();
+                this.closeEditAccountModal();
                 
                 // Update display if it's the current account
-                if (this.currentAccountId === id) {
+                if (this.currentAccountId === this.editingAccountId) {
                     this.updateAllDisplays();
                 }
             }
@@ -2867,6 +2920,10 @@
                     ? `${account.name} 🔥` 
                     : account.name;
                 document.getElementById('currentAccountDisplay').textContent = displayText;
+                
+                // Update top bar account display
+                document.getElementById('topAccountName').textContent = account.name;
+                document.getElementById('topAccountFirm').textContent = `🏢 ${account.propFirm}`;
                 
                 this.updateWidgets();
                 this.renderCalendar();
