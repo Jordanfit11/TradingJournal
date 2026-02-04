@@ -1355,15 +1355,31 @@
                     </button>
                     <button class="btn btn-outline" id="googleSignInBtn" onclick="journal.signInWithGoogle()" style="display: flex; align-items: center; gap: 0.5rem;">
                         <span>☁️</span>
-                        <span class="desktop-text">Se connecter</span>
+                        <span class="desktop-text">Google Drive</span>
                     </button>
-                    <div id="googleUserBadge" style="display: none; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
-                        <img id="googleUserAvatarTop" style="width: 32px; height: 32px; border-radius: 50%;" src="" alt="">
-                        <div style="display: flex; flex-direction: column; min-width: 0;">
-                            <span style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="googleUserNameTop"></span>
-                            <span style="font-size: 0.7rem; color: var(--text-secondary);">Connecté</span>
+                    <div id="googleUserBadge" style="display: none; align-items: center; gap: 0.5rem;">
+                        <!-- Avatar with initials -->
+                        <div style="position: relative; cursor: pointer;" onclick="journal.toggleUserMenu()">
+                            <div id="userAvatar" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; color: white; cursor: pointer; box-shadow: 0 2px 8px var(--shadow);">
+                                JD
+                            </div>
+                            <div id="syncIndicator" style="position: absolute; bottom: 0; right: 0; width: 12px; height: 12px; background: var(--accent-green); border: 2px solid var(--bg-secondary); border-radius: 50%;" title="Synchronisé"></div>
                         </div>
-                        <button onclick="journal.signOutFromTop()" style="background: transparent; border: 1px solid var(--border); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" title="Déconnexion">×</button>
+                        
+                        <!-- User menu dropdown -->
+                        <div id="userMenu" style="display: none; position: absolute; top: 60px; right: 20px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem; min-width: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000;">
+                            <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;" id="googleUserNameMenu">User Name</div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary);" id="googleUserEmailMenu">user@email.com</div>
+                                <div style="font-size: 0.75rem; color: var(--accent-green); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
+                                    <span>●</span>
+                                    <span>Synchronisé avec Google Drive</span>
+                                </div>
+                            </div>
+                            <button onclick="journal.signOutFromTop()" style="width: 100%; background: transparent; border: none; color: var(--accent-red); padding: 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; text-align: left; margin-top: 0.25rem;" onmouseover="this.style.background='var(--bg-secondary)'" onmouseout="this.style.background='transparent'">
+                                🚪 Déconnexion
+                            </button>
+                        </div>
                     </div>
                     <button class="btn" onclick="journal.openTradeModal()">
                         <span class="desktop-text">+ Nouveau Trade</span>
@@ -2084,6 +2100,16 @@
                         this.renderTrades();
                     });
                 });
+
+                // Close user menu when clicking outside
+                document.addEventListener('click', (e) => {
+                    const userMenu = document.getElementById('userMenu');
+                    const userAvatar = document.getElementById('userAvatar');
+                    
+                    if (userMenu && !userMenu.contains(e.target) && !userAvatar.contains(e.target)) {
+                        userMenu.style.display = 'none';
+                    }
+                });
             }
 
             switchView(viewName) {
@@ -2225,11 +2251,14 @@
                                         ${this.formatCurrency(accCapital)}
                                     </div>
                                     <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
-                                        <button class="rename-account-btn" data-account-id="${acc.id}" style="padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-primary); color: var(--accent-primary); border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Renommer">
-                                            ✏️
+                                        <button class="edit-account-btn" data-account-id="${acc.id}" style="padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-primary); color: var(--accent-primary); border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Éditer">
+                                            ✏️ Éditer
                                         </button>
                                         <button class="burn-account-btn" data-account-id="${acc.id}" style="padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
                                             🔥 Griller
+                                        </button>
+                                        <button class="delete-account-btn" data-account-id="${acc.id}" style="padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Supprimer">
+                                            🗑️
                                         </button>
                                     </div>
                                 </div>
@@ -2266,9 +2295,14 @@
                                     <div class="account-value" style="color: var(--text-secondary)">
                                         ${this.formatCurrency(accCapital)}
                                     </div>
-                                    <button class="burn-account-btn" data-account-id="${acc.id}" style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-green); color: var(--accent-green); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
-                                        ✅ Réactiver
-                                    </button>
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: flex-end; flex-wrap: wrap;">
+                                        <button class="burn-account-btn" data-account-id="${acc.id}" style="padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-green); color: var(--accent-green); border-radius: 4px; cursor: pointer; font-size: 0.75rem;">
+                                            ✅ Réactiver
+                                        </button>
+                                        <button class="delete-account-btn" data-account-id="${acc.id}" style="padding: 0.25rem 0.75rem; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); border-radius: 4px; cursor: pointer; font-size: 0.75rem;" title="Supprimer">
+                                            🗑️
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -2277,20 +2311,30 @@
 
                 list.innerHTML = html;
 
-                // Add event listeners to buttons
-                document.querySelectorAll('.rename-account-btn').forEach(btn => {
+                // Add event listeners to edit buttons
+                document.querySelectorAll('.edit-account-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const accountId = parseInt(btn.dataset.accountId);
-                        this.renameAccount(accountId);
+                        this.editAccount(accountId);
                     });
                 });
 
+                // Add event listeners to burn/reactivate buttons
                 document.querySelectorAll('.burn-account-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const accountId = parseInt(btn.dataset.accountId);
                         this.toggleBurnAccount(accountId);
+                    });
+                });
+
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-account-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const accountId = parseInt(btn.dataset.accountId);
+                        this.deleteAccount(accountId);
                     });
                 });
             }
@@ -2308,21 +2352,62 @@
                 this.updateAllDisplays();
             }
 
-            renameAccount(id) {
+            editAccount(id) {
                 const account = this.accounts.find(a => a.id === id);
                 if (!account) return;
 
-                const newName = prompt(`Renommer le compte "${account.name}"`, account.name);
-                if (newName && newName.trim() && newName !== account.name) {
-                    account.name = newName.trim();
-                    this.saveAccounts();
-                    this.renderAccountList();
-                    
-                    // Update display if it's the current account
-                    if (this.currentAccountId === id) {
-                        this.updateAllDisplays();
-                    }
+                const newName = prompt(`Nom du compte :`, account.name);
+                if (!newName || !newName.trim()) return;
+
+                const newPropFirm = prompt(`Prop Firm :`, account.propFirm);
+                if (!newPropFirm || !newPropFirm.trim()) return;
+
+                // Update account
+                account.name = newName.trim();
+                account.propFirm = newPropFirm.trim();
+                
+                this.saveAccounts();
+                this.renderAccountList();
+                
+                // Update display if it's the current account
+                if (this.currentAccountId === id) {
+                    this.updateAllDisplays();
                 }
+            }
+
+            deleteAccount(id) {
+                const account = this.accounts.find(a => a.id === id);
+                if (!account) return;
+
+                // Check if it's the last account
+                if (this.accounts.length === 1) {
+                    alert('❌ Impossible de supprimer le dernier compte. Vous devez avoir au moins un compte.');
+                    return;
+                }
+
+                // Confirm deletion
+                if (!confirm(`⚠️ ATTENTION : Supprimer le compte "${account.name}" ?\n\n❌ Tous les trades de ce compte seront DÉFINITIVEMENT supprimés !\n\nCette action est IRRÉVERSIBLE.`)) {
+                    return;
+                }
+
+                // Delete all trades from this account
+                this.trades = this.trades.filter(t => t.accountId !== id);
+                
+                // Delete the account
+                this.accounts = this.accounts.filter(a => a.id !== id);
+
+                // If it was the current account, switch to another
+                if (this.currentAccountId === id) {
+                    this.currentAccountId = this.accounts[0].id;
+                    this.saveCurrentAccountId();
+                }
+
+                this.saveAccounts();
+                this.saveTrades();
+                this.renderAccountList();
+                this.updateAllDisplays();
+                
+                alert('✅ Compte supprimé avec succès.');
             }
 
             toggleBurnAccount(id) {
@@ -3111,11 +3196,16 @@
 
                 // Accounts comparison
                 const accountsComparison = this.accounts.map(acc => {
-                    const accTrades = this.trades.filter(t => t.accountId === acc.id);
+                    // Exclude payouts from trading stats
+                    const accTrades = this.trades.filter(t => t.accountId === acc.id && !t.isPayout);
                     const accPnL = accTrades.reduce((s, t) => s + t.pnl, 0);
                     const accWins = accTrades.filter(t => t.pnl > 0).length;
                     const accWR = accTrades.length > 0 ? (accWins / accTrades.length * 100).toFixed(1) : 0;
-                    const accCapital = acc.baseCapital + accPnL;
+                    
+                    // Capital includes payouts (real capital)
+                    const allAccountTrades = this.trades.filter(t => t.accountId === acc.id);
+                    const totalPnL = allAccountTrades.reduce((s, t) => s + t.pnl, 0);
+                    const accCapital = acc.baseCapital + totalPnL;
                     
                     return { acc, accPnL, accTrades, accWins, accWR, accCapital };
                 }).sort((a, b) => b.accPnL - a.accPnL);
@@ -3227,26 +3317,38 @@
                 const userBadge = document.getElementById('googleUserBadge');
 
                 if (signedIn && this.googleUser) {
-                    // Desktop: show badge, hide button
-                    if (window.innerWidth > 768) {
-                        signInBtn.style.display = 'none';
-                        userBadge.style.display = 'flex';
-                        userBadge.style.removeProperty('display');
-                    } else {
-                        // Mobile: show button with green dot
-                        signInBtn.classList.add('connected');
-                        signInBtn.style.display = 'flex';
-                        signInBtn.style.position = 'relative';
-                        userBadge.style.display = 'none';
-                    }
+                    // Show avatar
+                    signInBtn.style.display = 'none';
+                    userBadge.style.display = 'flex';
                     
-                    document.getElementById('googleUserNameTop').textContent = this.googleUser.name;
-                    document.getElementById('googleUserAvatarTop').src = this.googleUser.picture;
+                    // Generate initials
+                    const initials = this.getInitials(this.googleUser.name || 'User');
+                    document.getElementById('userAvatar').textContent = initials;
+                    
+                    // Update menu
+                    document.getElementById('googleUserNameMenu').textContent = this.googleUser.name;
+                    document.getElementById('googleUserEmailMenu').textContent = this.googleUser.email;
                 } else {
-                    signInBtn.classList.remove('connected');
                     signInBtn.style.display = 'flex';
-                    signInBtn.style.removeProperty('position');
                     userBadge.style.display = 'none';
+                }
+            }
+
+            getInitials(name) {
+                if (!name) return 'U';
+                const parts = name.trim().split(' ');
+                if (parts.length >= 2) {
+                    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                }
+                return name.substring(0, 2).toUpperCase();
+            }
+
+            toggleUserMenu() {
+                const menu = document.getElementById('userMenu');
+                if (menu.style.display === 'none' || !menu.style.display) {
+                    menu.style.display = 'block';
+                } else {
+                    menu.style.display = 'none';
                 }
             }
 
